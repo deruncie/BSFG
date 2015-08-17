@@ -42,6 +42,11 @@ dim(Y)
 
 M  <- D*(P-D)+ D*(D-1)/2
 M
+#24
+
+# need to figure out linear algebra of output
+
+
 
 
 
