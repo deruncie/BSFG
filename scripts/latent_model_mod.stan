@@ -14,16 +14,16 @@ transformed data {
 }
 
 parameters {    
+  int<lower=1> D;              // number of latent dimensions 
   vector<lower=0>[P] psi;      // vector of variances
   real<lower=0>  mu_psi;
   real<lower=0>  sigma_psi;
   real           mu_lt;
   real<lower=0>  sigma_lt;
-  int<lower=1> D;                // number of latent dimensions 
 }
 
 transformed parameters{
-  int<lower=1> M;
+  real<lower=1> M;
   M  <- D*(P-D)+ D*(D-1)/2;    // calculate number of non-zero loadings
   vector[M] L_t;               // lower triangle elements of L
   vector<lower=0>[D] L_d;      // lower diagonal elements of L
