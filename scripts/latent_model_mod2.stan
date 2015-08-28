@@ -4,8 +4,8 @@
 
 data {
   int<lower=1> n;                // number of observations
-  int<lower=1> p;                // number of predictors
-  matrix[n,p]  Y;                // data matrix of order [n,p]
+  int<lower=1> p;                // number of traits
+  matrix[p,n]  Y;                // data matrix of order [n,p]
   int<lower=1> f;                // number of latent factors 
 }
 
