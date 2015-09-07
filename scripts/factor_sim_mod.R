@@ -47,6 +47,7 @@ M  <- D*(P-D)+ D*(D-1)/2
 M
 
 fa.data <-list(P=P,N=N,Y=Y,D=D)
+fa.data2 <-list(P=P,N=N,Y=Y)
 
 # a function to generate intial values that are slightly jittered for each chain.
 init_fun = function() {
@@ -61,7 +62,7 @@ init_fun = function() {
 } 
 
 #compile the model
-fa.model<- stan("latent_model.stan", 
+fa.model<- stan("latent_model_mod2.stan", 
                   data = fa.data,
                   chains =1, 
                   pars=c("L","psi","sigma_psi","mu_psi","sigma_lt","mu_lt"))
