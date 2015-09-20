@@ -31,8 +31,10 @@ parameters {
 
 transformed parameters{
   cholesky_factor_cov[p,f] L;  // lower triangular factor loadings Matrix 
-  diag_matrix(rep_vector(1, rows(f))) I;
-  //cov_matrix[P] T;             // Covariance matrix
+  diag_matrix(rep_vector(1, rows(f))) I; // factor identity matrix
+  matrix[f,f] L_mu;            // factor matrix 
+  vector[f] 
+
 {
   int idx1;
   int idx2;
@@ -54,10 +56,10 @@ transformed parameters{
 } 
 // Q <- L*L' + diag_matrix(psi); // recover covariance matrix, add error covariance matrix
 // instead calculate the F matrix and put a prior on it
+L_mu <- L*mu_f
 }
 
 model {
-  matrix[f,f]  SIG;
 // the hyperpriors 
    mu_psi ~ cauchy(0, 1);
    sigma_psi ~ cauchy(0,1);
@@ -67,10 +69,13 @@ model {
   L_d ~ cauchy(0,3);
   L_t ~ cauchy(mu_lt,sigma_lt);
   psi ~ cauchy(mu_psi,sigma_psi);
-  mu_f ~ multi_normal(0,I)
-//The likelihood
+
+for(i in 1:n)
+    mu_f[i] ~ multi_normal(zeros,I) # zero vector
+
 for( j in 1:n)
-    Y[j] ~ multi_normal(L*mu_f,psi);
+    Y[j] ~ multi_normal(L_mu,psi);
+
 }
 
 
