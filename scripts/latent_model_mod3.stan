@@ -53,7 +53,7 @@ transformed parameters{
 } 
 // Q <- L*L' + diag_matrix(psi); // recover covariance matrix, add error covariance matrix
 // instead calculate the F matrix and put a prior on it
-L_mu <- L*F // L [p, f]  
+L_mu <- L*F // L [p, f]  can calculate this below
 }
 
 model {
@@ -72,7 +72,7 @@ for( i in 1:n)
     F[i] ~ multi_normal(mu_f, I); # zero vector
 
 for( i in 1:n)
-    Y[i] ~ multi_normal(L_mu, psi); 
+    Y[i] ~ multi_normal(L_mu, psi); //can calculate the fi column directly in call to distribution
 }
 
 
