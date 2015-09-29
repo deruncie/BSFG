@@ -1,17 +1,17 @@
 // https://groups.google.com/forum/#!topic/stan-users/qGAUsyJWyMA
 
 data{
-int N; // sample size
-int P; // number of variables
-int D; // number of dimensions
+int N;          // sample size
+int P;          // number of variables
+int D;          // number of dimensions
 vector[P] X[N]; // data matrix of order [N,P]
 }
 
 parameters{
-vector[P] b; // intercepts
+vector[P] b;            // intercepts
 vector<lower=0>[P] lam; // factor loadings
-vector[D] FS[N]; // factor scores, matrix of order [N,D]
-corr_matrix[D] Rho; // correlation matrix between factors
+vector[D] FS[N];        // factor scores, matrix of order [N,D]
+corr_matrix[D] Rho;     // correlation matrix between factors
 vector<lower=0,upper=100>[P] var_p; // variance for each variable
 }
 
