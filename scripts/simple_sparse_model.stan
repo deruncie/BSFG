@@ -12,6 +12,15 @@ functions{
     }
     return(res);
   }
+
+  vector cum_prod(vector X){
+    vector[rows(X)] res;
+    res[1] <- X[1];
+    for (i in 2:rows(X)){
+      res[i] <- res[i-1]*X[i];
+    }
+    return(res);
+  }
 }
 
 data {
@@ -20,6 +29,10 @@ data {
   int<lower=1> K;                // number of latent factors 
   matrix[n,p]  Y;                // data matrix of order [n,p]
   matrix[K,K]  I;
+  real          nu;
+  real         alpha1;
+  real         alpha2;
+
 }
 
 transformed data {
@@ -32,16 +45,17 @@ parameters{
   vector<lower=0>[p]   sigma;
   matrix<lower=0>[p,K] psi;
   matrix[p,K]          Lambda_std;
+  vector<lower=0>[1]    delta;
+  vector<lower=0>[K-1] delta1;
+
   //real            lam;
 }
 
 transformed parameters{
-//  diag_matrix(rep_vector(1, K)) I; // factor identity matrix
+  vector[K] tau;
   matrix[p,K] Lambda;
-  //Lambda <- diag_pre_multiply(Lambda_std * sqrt(1/ps);
-  Lambda <- Lambda_std ./ sqrt_mat(psi);
-  //print(row(Lambda,1));
-//Lambda <- operator./(Lambda_std,sqrt_mat(psi))
+  tau <- cum_prod(append_row(delta,delta1));
+  Lambda <- Lambda_std ./ sqrt_mat(diag_post_multiply(psi,tau));
 
 }
 
@@ -49,20 +63,13 @@ model {
   vector[p] mu;
   for(i in 1:p){
     row(Lambda_std,i) ~ normal(0,1);
-    row(psi,i) ~ gamma(3.0/2.0, 3.0/2.0);
+    row(psi,i) ~ gamma(nu/2.0, nu/2.0);
   }
-  # Lambda_std ~ normal(0,1);
+
+  delta ~ gamma(alpha1, 1);
+  delta1 ~ gamma(alpha2,1);
+
   sigma ~ cauchy(0, 1);
-  
-
-
-
-  // Lambda ~ normal(0,sqrt(1/pdi));
-  // for( j in 1:p) {
-  //   for (k in 1:K) {
-  //     Lambda[j,K] ~ normal(0, 1/psi[j,k]);
-  //   }  
-  // }
 
   for(i in 1:n){
     F[i] ~ multi_normal(mu_f,I);
@@ -75,6 +82,7 @@ model {
     row(Y,i) ~ normal(Lambda*F[i], sigma);
   }
 }
+
 generated quantities {
   vector[p] Y_hat[n];
 
