@@ -46,7 +46,7 @@ parameters{
   matrix<lower=0>[p,K] psi;
   matrix[p,K]          Lambda_std;
   vector<lower=0>[1]    delta;
-  vector<lower=0>[K-1] delta1;
+  vector<lower=1>[K-1] delta1;
 
   //real            lam;
 }
