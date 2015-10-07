@@ -113,7 +113,7 @@ parameters{
   row_vector[p]          Lambda_std[K]; // std_normal underlying Lambda mixture
   row_vector<lower=0>[p] psi[K];        // part of the precision mixture contributing to t-distribution on Lambda components
   vector<lower=0>[1]     delta_1;    // first shrinkage component of tau
-  vector<lower=0>[K-1]   delta_K;    // remaining shrinkage components of tau
+  vector<lower=0>[max(0,K-1)]   delta_K;    // remaining shrinkage components of tau
 
 }
 
@@ -124,6 +124,8 @@ transformed parameters{
   row_vector[p] Lambda[K]; 
   vector[K]     tau;  
   vector[n]     QTF[K];     // rotated factor scores  
+
+  print("F_std: ",rows(F_std)," ",cols(F_std)," Lambda: ",rows(Lambda)," ",cols(Lambda)," F_h2: ",rows(F_h2)," delta_K: ",rows(delta_K));
 
 // total residual variance - re-parmeterized cauchy
   sigma_U2 <- sigma_scale * tan_vec(sigma_U2_unif);
@@ -152,6 +154,12 @@ model {
   vector[n] sd_E[p];  // residual standard deviations - including main random effect
 
 // note: mu, B have flat priors
+  mu ~ normal(0,1000);
+  if(b>0){
+    for(i in 1:b){
+      B[i] ~ normal(0,1000);
+    }
+  }
 
 // Random effect 2
   if(r2 > 0) {
@@ -215,7 +223,6 @@ generated quantities {
   matrix[p,p] G;
   matrix[p,p] R;
   
-  inv_tau <- rep_vector(1.0,K) ./ tau;
   E_h2 <- sigma2_a ./ (sigma2_a + sigma2_e);
   
   Y_hat <- rep_vector(1.0,n) * mu;
@@ -231,6 +238,8 @@ generated quantities {
   }
 
   if(K > 0) {
+    inv_tau <- rep_vector(1.0,K) ./ tau;
+
     for(k in 1:K){
       Y_hat <- Y_hat + Q * QTF[k] * Lambda[k];
     }
