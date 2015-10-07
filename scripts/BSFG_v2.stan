@@ -223,7 +223,7 @@ generated quantities {
   R <- diag_matrix(sigma2_e);
 
   if(b > 0){
-    Y_hat <- Y_hat + X * B_resid;
+    Y_hat <- Y_hat + X * B;
   }
 
   if(r2 > 0){

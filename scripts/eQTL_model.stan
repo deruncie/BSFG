@@ -52,31 +52,51 @@ functions{
     }
     return(res);
   }
+  vector sample_a_rng(vector y, matrix QZ1LtZt, vector d, matrix LQZ1){
+    // generate sample from the posterior of a given y, s2_a, s2_e: y ~ N(Za,s2e), a~N(0,s2_a*A)
+    // uses: QZ1 * diag(d) * QZ1' = 1/s2e*L'Z'ZL + 1/s2a*I
+    // with: LL' = A
+    vector[rows(d)] mu;
+    vector[rows(d)] a_tilde;
+    vector[rows(d)] a;
+    vector[rows(d)] d_inv;
+    d_inv <- pow_vec(d,-1.0);
+    mu <- diag_pre_multiply(d_inv,QZ1LtZt) * y;
+    for(i in 1:rows(d)){
+      a_tilde[i] <- normal_rng(mu[i],sqrt(d_inv[i]));
+    }
+    a <- LQZ1*a_tilde;
+    return(a);
+  }
 }
 
 data {
-  int<lower=1> n;                // number of individuals 1 ...n
-  int<lower=1> p;                // number of traits 1 ... p
-  int<lower=0> K;                // number of latent factors 
-  int<lower=1> b;                // number of fixed effects 
-  int<lower=0> r1;               // number of levels of random effect 1 (in Q)
-  int<lower=0> r2;               // number of levels of random effect 2 (not in Q)
-  matrix[n,p]  Y;                // data matrix of order [n,p]
-  matrix[n,b]  X;                // fixed effect design matrix
-  matrix[n,r1] Z1;               // random effect 2 design matrix
-  matrix[n,r2] Z2;               // random effect 2 design matrix
-  real         nu_B;      // shrinkage for Bs
-  real         alpha_B;
-  real         beta_B;
-  real         nu;        // shrinkage for Lambdas
-  real         alpha1;
-  real         beta1;
-  real         alpha2;
-  real         beta2;
-  real         sigma_scale;
-  matrix[n,n]  Q;
-  vector[n]    d;
-  int          F_vars_beta;
+  int<lower=1>  n;                // number of individuals 1 ...n
+  int<lower=1>  p;                // number of traits 1 ... p
+  int<lower=0>  K;                // number of latent factors 
+  int<lower=1>  b;                // number of fixed effects 
+  int<lower=0>  r1;               // number of levels of random effect 1 (in Q)
+  int<lower=0>  r2;               // number of levels of random effect 2 (not in Q)
+  matrix[n,p]   Y;                // data matrix of order [n,p]
+  matrix[n,b]   X;                // fixed effect design matrix
+  matrix[n,p]   cisGenotypes;     // genotypes for each of the p traits
+  matrix[n,r1]  Z1;               // random effect 2 design matrix
+  matrix[n,r2]  Z2;               // random effect 2 design matrix
+  real          nu_B;      // shrinkage for Bs
+  real          alpha_B;
+  real          beta_B;
+  real          nu;        // shrinkage for Lambdas
+  real          alpha1;
+  real          beta1;
+  real          alpha2;
+  real          beta2;
+  real          sigma_scale;
+  int           F_vars_beta;
+  matrix[n,n]   Q;         // Q * diag(d) * Q' = Z1 %*% t(Z1)
+  vector[n]     d;
+  matrix[r1,n]  QZ1LtZt;   // QZ1 * diag(QZ1_d) %*% QZ1' = t(L) %*% t(Z) %*% Z %*% L
+  vector[r1]    QZ1_d;
+  matrix[r1,r1] LQZ1;       
 }
 
 transformed data {
@@ -84,6 +104,7 @@ transformed data {
   vector[n]     QT_mu;
   vector[n]     QTY[p];
   matrix[n,b]   QTX;
+  matrix[n,p]   QTcis;
   matrix[n,r2]  QTZ2;
   int           num_vars; // 2 + any_fixed_effects + any_extra_random_effects
   print("N: ",n," p: ",p," b: ",b," K: ",K);
@@ -103,6 +124,9 @@ transformed data {
   // rotate X by QT
   QTX <- QT*X;
 
+  // rotate cisGenotypes by QT
+  QTcis <- QT*cisGenotypes;
+
   // rotate Z2 by QT
   if(r2 > 0){
     QTZ2 <- QT*Z2;
@@ -121,6 +145,8 @@ parameters{
   vector[b]             B_scale;        // scale factor for B coefficients
   matrix[b,p]           B_std;          // std_normal underlying fixed effect coefficients for Y
   matrix<lower=0>[b,p]  B_psi;          // precision of fixed effect coefficients for Y
+
+  vector[p]             cis_effects;    // cis effect coefficients
 
   vector[n]             F_std[K];       // std_normal underlying F
   vector[b]             B_F_std[K];     // std_normal underlying fixed effect coefficients for F
@@ -200,6 +226,7 @@ model {
   vector[n] sd_E[p];  // residual standard deviations - including main random effect
 
 // note: mu has flat priors
+  cis_effects ~ normal(0,1);
 
 // Random effect 2
   if(r2 > 0) {
@@ -257,7 +284,7 @@ model {
 // likelihood
   {
     matrix[n,p] QTY_mean;
-    QTY_mean <- QT_mu * mu;
+    QTY_mean <- QT_mu * mu + diag_post_multiply(QTcis,cis_effects);
     if(b > 0){
       QTY_mean <- QTY_mean + QTX * B_resid;
     }
@@ -284,7 +311,7 @@ generated quantities {
   matrix[p,p] G;
   matrix[p,p] R;
   matrix[b,p] B;
-  vector[r1]  Fa[K];     // generated factor scores for random effect 1
+  // vector[r1]  Fa[K];     // generated factor scores for random effect 1
   
   inv_tau <- rep_vector(1.0,K) ./ tau;
   
@@ -318,6 +345,18 @@ generated quantities {
     for(k in 1:K){
       B <- B + B_F[k] * Lambda[k];
     }
+
+    // for(k in 1:K){
+    //   vector[n] f_resid;
+    //   f_resid <- Q*QTF[k];
+    //   if(b > 0){
+    //     f_resid <- f_resid - X*B_F[k];
+    //   }
+    //   if(r2 > 0){
+    //     f_resid <- f_resid - Z2*U2_F[k];
+    //   }
+    //   Fa[k] <- sample_a_rng(f_resid,QZ1LtZt,1.0/F_vars[k][1] + QZ1_d/F_vars[k][2],LQZ1);
+    // }
   }
   
 }
