@@ -311,7 +311,7 @@ generated quantities {
   matrix[p,p] G;
   matrix[p,p] R;
   matrix[b,p] B;
-  // vector[r1]  Fa[K];     // generated factor scores for random effect 1
+  vector[r1]  Fa[K];     // generated factor scores for random effect 1
   
   inv_tau <- rep_vector(1.0,K) ./ tau;
   
@@ -346,17 +346,17 @@ generated quantities {
       B <- B + B_F[k] * Lambda[k];
     }
 
-    // for(k in 1:K){
-    //   vector[n] f_resid;
-    //   f_resid <- Q*QTF[k];
-    //   if(b > 0){
-    //     f_resid <- f_resid - X*B_F[k];
-    //   }
-    //   if(r2 > 0){
-    //     f_resid <- f_resid - Z2*U2_F[k];
-    //   }
-    //   Fa[k] <- sample_a_rng(f_resid,QZ1LtZt,1.0/F_vars[k][1] + QZ1_d/F_vars[k][2],LQZ1);
-    // }
+    for(k in 1:K){
+      vector[n] f_resid;
+      f_resid <- Q*QTF[k];
+      if(b > 0){
+        f_resid <- f_resid - X*B_F[k];
+      }
+      if(r2 > 0){
+        f_resid <- f_resid - Z2*U2_F[k];
+      }
+      Fa[k] <- sample_a_rng(f_resid,QZ1LtZt,1.0/F_vars[k][1] + QZ1_d/F_vars[k][2],LQZ1);
+    }
   }
   
 }
