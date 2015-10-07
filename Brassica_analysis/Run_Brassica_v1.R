@@ -8,8 +8,12 @@ data = data.frame(ID = colnames(in_data)[-c(1)])
 data$Genotype = sapply(as.character(data$ID),function(x) paste(strsplit(x,'_')[[1]][1:2],collapse='_'))
 data$TRT = sapply(as.character(data$ID),function(x) strsplit(x,'_')[[1]][3])
 
+Y = t(in_data[,-1])
+Y = sweep(Y,1,rowMeans(Y),'-')
+Y = sweep(Y,1,apply(Y,1,sd),'/')
+
 Bra_data = list()
-Bra_data$Y = t(in_data[,-1])
+Bra_data$Y = Y
 Bra_data$Z1 = model.matrix(~Genotype+0,data)
 Bra_data$X = matrix(model.matrix(~TRT,data)[,-1],nc=1)
 Bra_data$A1 = diag(1,ncol(Bra_data$Z1))
