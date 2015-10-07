@@ -1,4 +1,4 @@
-library("rstan")
+library("rstan",'~/R/x86_64-pc-linux-gnu-library/3.2/')
 rstan_options(auto_write = T)
 options(mc.cores = 1)
 
