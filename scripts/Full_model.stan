@@ -283,6 +283,7 @@ generated quantities {
   matrix[n,p] Y_hat;
   vector[K] inv_tau;
   vector[K] F_h2;
+  vector[p] E_h2;
   matrix[p,p] G;
   matrix[p,p] R;
   matrix[b,p] B;
@@ -293,6 +294,8 @@ generated quantities {
   G <- diag_matrix(sigma2_a);
   R <- diag_matrix(sigma2_e);
   B <- B_resid;
+
+  E_h2 <- sigma2_a ./ (sigma2_a + sigma2_e);
 
   if(b > 0){
     Y_hat <- Y_hat + X * B_resid;

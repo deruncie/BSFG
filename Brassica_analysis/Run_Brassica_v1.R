@@ -57,7 +57,7 @@ if(is.null(Bra_data$Z2)){
 }
 
 Nitt = 300
-warmup = 100
+warmup = 200
 chains = 1
 
 Full_model <- stan(file = '../scripts/Full_model.stan', chains = 0)
