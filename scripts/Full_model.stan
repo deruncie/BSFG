@@ -131,7 +131,6 @@ parameters{
   row_vector[p]          Lambda_std[K]; // std_normal underlying Lambda mixture
   row_vector<lower=0>[p] psi[K];        // part of the precision mixture contributing to t-distribution on Lambda components
   vector<lower=0>[K]     delta;    // shrinkage components of tau
-
 }
 
 transformed parameters{
@@ -200,6 +199,7 @@ model {
   vector[n] sd_E[p];  // residual standard deviations - including main random effect
 
 // note: mu has flat priors
+  mu ~ normal(0,1000);
 
 // Random effect 2
   if(r2 > 0) {

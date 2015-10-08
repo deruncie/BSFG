@@ -1,6 +1,6 @@
 library("rstan")
 rstan_options(auto_write = T)
-options(mc.cores = 1)
+options(mc.cores = 4)
 
 
 sim_dir = 'Sim_FE4_1'
@@ -9,8 +9,8 @@ Y = sim_data$Y
 
 # set priors
 sim_data$K = 4
-sim_data$nu = 3
-sim_data$nu_B = 1
+sim_data$nu = 9
+sim_data$nu_B = 9
 sim_data$alpha_B = 2.1
 sim_data$beta_B = 1/5
 sim_data$alpha1 = 2.1
@@ -40,21 +40,26 @@ if(is.null(sim_data$Z2)){
   sim_data$A2_chol = matrix(0,0,0)
 }
 
-Nitt = 100
-warmup = 50
+Nitt = 500
+warmup = 150
 chains = 1
 
 bsfg_model = stan(file = 'BSFG_testing1.stan',chains=0)
 noDelta_model = stan(file = 'BSFG_noDelta.stan',chains=0)
 noK_model = stan(file = 'BSFG_v4_noK.stan',chains=0)
 full_model = stan(file = 'Full_model.stan',chains=0)
+simpleB_model = stan(file = 'simpleB_model.stan',chains=0)
+B_ARD_model = stan(file = 'B_ARD_model.stan',chains=0)
+B_GDP_model = stan(file = 'B_GDP_model.stan',chains=0)
 
-genes = 1:ncol(Y)
+genes = 1:10#ncol(Y)
 sim_data$Y = Y[,genes]
 sim_data$p = ncol(sim_data$Y)
-sim_data$K = 1
+sim_data$K = 0
 
-model = bsfg_model
+model = simpleB_model
+model = B_ARD_model
+model = B_GDP_model
 # model = noDelta_model
 # model = noK_model
 fit <- sampling(object = get_stanmodel(model), data = sim_data, 
@@ -72,6 +77,9 @@ summary(do.call(rbind, args = list(a)), digits = 2)
 summary(do.call(rbind, args = get_sampler_params(fit, inc_warmup = F)), digits = 2)
 lapply(get_sampler_params(fit, inc_warmup = F),function(x) summary(x,digits=2))
 
+e = extract(fit)
+i = 1
+plot(e$B_psi[,1,i],e$B_std[,1,i])
 
 samples = extract(fit)
 n = dim(samples[[1]])[1]
