@@ -1,6 +1,6 @@
 library("rstan")
 rstan_options(auto_write = T)
-options(mc.cores = 4)
+options(mc.cores = 1)
 
 
 sim_dir = 'Sim_FE4_1'
@@ -36,12 +36,13 @@ if(is.null(sim_data$X)){
 # if no Z2, add fake Z2
 if(is.null(sim_data$Z2)){
 	sim_data$Z2 = matrix(0,nr=sim_data$n,nc = 0)
-	sim_data$r2 = 0
+  sim_data$r2 = 0
+  sim_data$A2_chol = matrix(0,0,0)
 }
 
-Nitt = 300
-warmup = 200
-chains = 4
+Nitt = 100
+warmup = 50
+chains = 1
 
 bsfg_model = stan(file = 'BSFG_testing1.stan',chains=0)
 noDelta_model = stan(file = 'BSFG_noDelta.stan',chains=0)
@@ -51,7 +52,7 @@ full_model = stan(file = 'Full_model.stan',chains=0)
 genes = 1:ncol(Y)
 sim_data$Y = Y[,genes]
 sim_data$p = ncol(sim_data$Y)
-sim_data$K = 0
+sim_data$K = 4
 
 model = bsfg_model
 # model = noDelta_model
@@ -60,7 +61,7 @@ fit <- sampling(object = get_stanmodel(model), data = sim_data,
             iter = Nitt, warmup = warmup,chains = chains, verbose = TRUE, refresh = 10,
             control = list(
               # adapt_delta = 0.95,
-                max_treedepth = 6
+                # max_treedepth = 6
               )
             # ,pars = c("Lambda","F_h2","sigma2_a","sigma2_e","inv_tau","Y_hat","G","R","B","mu"), include = T
             # ,pars = c("mu",), include = T
