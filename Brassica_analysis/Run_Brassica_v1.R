@@ -24,7 +24,7 @@ Bra_data$p = ncol(Bra_data$Y)
 Bra_data$b = ncol(Bra_data$X)
 
 # set priors
-Bra_data$K = 5
+Bra_data$K = 10
 Bra_data$nu = 5
 Bra_data$nu_B = 5
 Bra_data$alpha_B = 2.1
@@ -68,7 +68,7 @@ Full_model_fit <- sampling(object = get_stanmodel(Full_model), data = Bra_data,
               # adapt_delta = 0.5,
               # max_treedepth = 12
               )
-            ,pars = c("Lambda","QTF","F_vars","F_h2","E_h2","sigma","inv_tau","Y_hat","G","R","B","B_F","mu","B_scale"), include = T
+            ,pars = c("Lambda","QTF","F_vars","F_h2","E_h2","sigma2_a","sigma2_e","inv_tau","Y_hat","G","R","B","B_F","mu","B_scale"), include = T
             )
 fit = Full_model_fit
 save(fit,file = sprintf('Bra_data_fit_K_%d.RData',sim_data$K))
