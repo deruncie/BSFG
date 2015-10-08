@@ -4,7 +4,7 @@
 // Daniel Runcie --deruncie@ucdavis.edu
 // v2c - adding fixed effects for F
 // v3 - altering fixed effect structure for F vs Y
-// 
+//  
 
 functions{
   vector tan_vec(vector X){
