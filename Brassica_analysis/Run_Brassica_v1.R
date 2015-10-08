@@ -24,7 +24,7 @@ Bra_data$p = ncol(Bra_data$Y)
 Bra_data$b = ncol(Bra_data$X)
 
 # set priors
-Bra_data$K = 5
+Bra_data$K = 10
 Bra_data$nu = 5
 Bra_data$nu_B = 5
 Bra_data$alpha_B = 2.1
