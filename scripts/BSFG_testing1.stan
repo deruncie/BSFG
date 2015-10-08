@@ -59,6 +59,7 @@ data {
   matrix[n,p]  Y;                // data matrix of order [n,p]
   matrix[n,b]  X;                // fixed effect design matrix
   matrix[n,r2] Z2;               // random effect 2 design matrix
+  matrix[r2,r2] A2_chol;         // cholesky factor for A2 such that A2_chol * A2_chol' = A2
   real         nu;        // shrinkage for Lambdas
   real         alpha1;
   real         beta1;
@@ -106,10 +107,7 @@ parameters{
   vector[n]                    F_std[K];       // std_normal underlying F
   vector<lower=0,upper=.95>[K] F_h2;            // residual heritability
 
-  vector<lower=0,upper=pi()/2>[p] sigma_unif[2+(r2>0)];      // sd 2nd random effect - re-parameterized cauchy
-  // vector<lower=0,upper=pi()/2>[p] sigma_U2_unif;      // sd 2nd random effect - re-parameterized cauchy
-  // vector<lower=0,upper=pi()/2>[p] sigma_a_unif;      // residual genetic sd - re-parameterized cauchy
-  // vector<lower=0,upper=pi()/2>[p] sigma_e_unif;      // residual residual sd - re-parameterized cauchy
+  vector<lower=0,upper=pi()/2>[p] sigma_unif[2+(r2>0)];      // sd random effects; 1 = A, 2 = I, 3 = Z2.
 
   row_vector[p]          Lambda_std[K]; // std_normal underlying Lambda mixture
   row_vector<lower=0>[p] psi[K];        // part of the precision mixture contributing to t-distribution on Lambda components
@@ -172,16 +170,14 @@ model {
     }
   }
 
-  // delta_1 ~ gamma(alpha1, beta1); // global shrinkage
 //Factors
   if(K > 0){
   // components of Lambda
     delta[1] ~ gamma(alpha1, beta1); // global shrinkage
     // column-wise shrinkage
     if(K>1){
-      segment(delta,2,K)  ~ gamma(alpha2, beta2); // additional shrinkage 
+      segment(delta,2,K-1)  ~ gamma(alpha2, beta2); // additional shrinkage 
     }
-    // delta_K ~ gamma(alpha2, beta2); // additional shrinkage
     // coefficients
     for(k in 1:K){
       Lambda_std[k] ~ normal(0,1);
@@ -210,7 +206,7 @@ model {
     }
     // add in random effect 2
     if(r2 > 0){
-      QTY_mean <- QTY_mean + QTZ2 * diag_post_multiply(U2_std,sigma_U2);
+      QTY_mean <- QTY_mean + QTZ2 * A2_chol * diag_post_multiply(U2_std,sigma_U2);
     }
     // add in factors
     if(K > 0){
