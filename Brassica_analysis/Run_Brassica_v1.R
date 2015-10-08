@@ -11,6 +11,8 @@ data$TRT = sapply(as.character(data$ID),function(x) strsplit(x,'_')[[1]][3])
 Y = t(in_data[,-1])
 Y = sweep(Y,1,rowMeans(Y),'-')
 Y = sweep(Y,1,apply(Y,1,sd),'/')
+# data = data[1:400,]
+# Y = Y[1:400,1:50]
 
 Bra_data = list()
 Bra_data$Y = Y
@@ -22,9 +24,9 @@ Bra_data$p = ncol(Bra_data$Y)
 Bra_data$b = ncol(Bra_data$X)
 
 # set priors
-Bra_data$K = 10
-Bra_data$nu = 3
-Bra_data$nu_B = 1
+Bra_data$K = 5
+Bra_data$nu = 5
+Bra_data$nu_B = 5
 Bra_data$alpha_B = 2.1
 Bra_data$beta_B = 1/5
 Bra_data$alpha1 = 2.1
@@ -51,6 +53,7 @@ if(is.null(Bra_data$X)){
 if(is.null(Bra_data$Z2)){
 	Bra_data$Z2 = matrix(0,nr=Bra_data$n,nc = 0)
 	Bra_data$r2 = 0
+  Bra_data$A2_chol = matrix(0,0,0)
 }
 
 Nitt = 300
