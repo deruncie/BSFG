@@ -52,7 +52,7 @@ full_model = stan(file = 'Full_model.stan',chains=0)
 genes = 1:ncol(Y)
 sim_data$Y = Y[,genes]
 sim_data$p = ncol(sim_data$Y)
-sim_data$K = 4
+sim_data$K = 1
 
 model = bsfg_model
 # model = noDelta_model

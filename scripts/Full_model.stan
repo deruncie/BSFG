@@ -63,6 +63,7 @@ data {
   matrix[n,p]  Y;                // data matrix of order [n,p]
   matrix[n,b]  X;                // fixed effect design matrix
   matrix[n,r2] Z2;               // random effect 2 design matrix
+  matrix[r2,r2] A2_chol;         // cholesky factor for A2 such that A2_chol * A2_chol' = A2
   real         nu_B;      // shrinkage for Bs
   real         alpha_B;
   real         beta_B;
@@ -125,20 +126,18 @@ parameters{
   vector[r2]            U2_F_std[K];     // std_normal underlying random effect 2 coefficients for F
   vector[F_vars_beta]   F_vars_z[K,num_vars];  // components of re-parameterized simplex F_vars - a,r,b,a2
 
-  vector<lower=0,upper=pi()/2>[p] sigma_U2_unif;      // sd 2nd random effect - re-parameterized cauchy
-  vector<lower=0,upper=pi()/2>[p] sigma_unif;         // total variation (G+E) of each gene's residuals on the factors - re-parameterized cauchy
-  vector<lower=0,upper=.95>[p]    E_h2;               // residual heritability
+  vector<lower=0,upper=pi()/2>[p] sigma_unif[2+(r2>0)];  // variances for residuals: 1: A, 2: I, 3: A2 - re-parameterized cauchy
 
   row_vector[p]          Lambda_std[K]; // std_normal underlying Lambda mixture
   row_vector<lower=0>[p] psi[K];        // part of the precision mixture contributing to t-distribution on Lambda components
-  vector<lower=0>[1]     delta_1;       // first shrinkage component of tau
-  vector<lower=0>[K-1]   delta_K;       // remaining shrinkage components of tau
+  vector<lower=0>[K]     delta;    // shrinkage components of tau
 
 }
 
 transformed parameters{
   vector[p]     sigma_U2;   // residual genetic sd
-  vector[p]     sigma;      // total variation (G+E) of each gene's residuals on the factors
+  vector[p]     sigma2_a;      // total variation (G+E) of each gene's residuals on the factors
+  vector[p]     sigma2_e;      // total variation (G+E) of each gene's residuals on the factors
   row_vector[p] Lambda[K]; 
   vector[K]     tau;  
   vector[n]     QTF[K];     // rotated factor scores  
@@ -148,8 +147,11 @@ transformed parameters{
   simplex[num_vars]    F_vars[K];   // variances of variance components of F (fixed, random, resid)
 
 // sds - re-parmeterized cauchy
-  sigma_U2 <- sigma_scale * tan_vec(sigma_U2_unif);
-  sigma    <- sigma_scale * tan_vec(sigma_unif);
+  sigma2_a <- pow_vec(sigma_scale * tan_vec(sigma_unif[1]),2.0);
+  sigma2_e <- pow_vec(sigma_scale * tan_vec(sigma_unif[2]),2.0);
+  if(r2 > 0) {
+    sigma_U2 <- sigma_scale * tan_vec(sigma_unif[3]);
+  }
 
 // Fixed effect residuals
   if(b > 0){
@@ -159,7 +161,7 @@ transformed parameters{
 // Factors
   if(K > 0){
 // Lambda - factor loadings
-    tau <- cum_prod(append_row(delta_1,delta_K));
+    tau <- cum_prod(delta);
     for(k in 1:K){
       Lambda[k] <- Lambda_std[k] ./ sqrt_rvec(psi[k] * tau[k]);
     }
@@ -187,7 +189,7 @@ transformed parameters{
       int var_index;
       var_index <- 3 + (b>0);
       for(k in 1:K){
-        U2_F[k] <- U2_F_std[k] * sqrt(F_vars[k][var_index]);
+        U2_F[k] <- A2_chol * U2_F_std[k] * sqrt(F_vars[k][var_index]);
         QTF[k] <- QTF[k] + QTZ2 * U2_F[k];
       }
     }
@@ -226,8 +228,10 @@ model {
   if(K > 0){
   // components of Lambda
     // column-wise shrinkage
-    delta_1 ~ gamma(alpha1, beta1); // global shrinkage
-    delta_K ~ gamma(alpha2, beta2); // additional shrinkage
+    delta[1] ~ gamma(alpha1, beta1); // global shrinkage
+    if(K>1){
+      segment(delta,2,K-1) ~ gamma(alpha2, beta2); // additional shrinkage
+    }
     // coefficients
     for(k in 1:K){
       Lambda_std[k] ~ normal(0,1);
@@ -249,7 +253,7 @@ model {
   
   //calculate rotated residual standard deviations - including main random effect
   for(j in 1:p){
-    sd_E[j] <- sigma[j] * sqrt_vec(E_h2[j] * d + (1.0 - E_h2[j]));
+    sd_E[j] <- sqrt_vec(sigma2_a[j] * d + sigma2_e[j]);
   }
 
 // likelihood
@@ -261,7 +265,7 @@ model {
     }
     // add in random effect 2
     if(r2 > 0){
-      QTY_mean <- QTY_mean + QTZ2 * diag_post_multiply(U2_std,sigma_U2);
+      QTY_mean <- QTY_mean + QTZ2 * A2_chol * diag_post_multiply(U2_std,sigma_U2);
     }
     // add in factors
     if(K > 0){
@@ -286,8 +290,8 @@ generated quantities {
   inv_tau <- rep_vector(1.0,K) ./ tau;
   
   Y_hat <- rep_vector(1.0,n) * mu;
-  G <- diag_matrix(pow_vec(sigma .* E_h2,2.0));
-  R <- diag_matrix(pow_vec(sigma .* (1.0-E_h2),2.0));
+  G <- diag_matrix(sigma2_a);
+  R <- diag_matrix(sigma2_e);
   B <- B_resid;
 
   if(b > 0){
@@ -295,7 +299,7 @@ generated quantities {
   }
 
   if(r2 > 0){
-    Y_hat <- Y_hat + Z2 * diag_post_multiply(U2_std,sigma_U2);
+    Y_hat <- Y_hat + Z2 * A2_chol * diag_post_multiply(U2_std,sigma_U2);
   }
 
   if(K > 0) {
