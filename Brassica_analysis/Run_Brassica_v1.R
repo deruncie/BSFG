@@ -1,4 +1,4 @@
-library("rstan",lib.loc='~/R/x86_64-pc-linux-gnu-library/3.2/')
+library("rstan")#,lib.loc='~/R/x86_64-pc-linux-gnu-library/3.2/')
 rstan_options(auto_write = T)
 options(mc.cores = 1)
 
@@ -11,8 +11,8 @@ data$TRT = sapply(as.character(data$ID),function(x) strsplit(x,'_')[[1]][3])
 Y = t(in_data[,-1])
 Y = sweep(Y,1,rowMeans(Y),'-')
 Y = sweep(Y,1,apply(Y,1,sd),'/')
-# data = data[1:400,]
-# Y = Y[1:400,1:50]
+data = data[1:50,]
+Y = Y[1:50,1:50]
 
 Bra_data = list()
 Bra_data$Y = Y
@@ -56,8 +56,8 @@ if(is.null(Bra_data$Z2)){
   Bra_data$A2_chol = matrix(0,0,0)
 }
 
-Nitt = 300
-warmup = 200
+Nitt = 100
+warmup = 50
 chains = 1
 
 Full_model <- stan(file = '../scripts/Full_model.stan', chains = 0)
@@ -66,10 +66,17 @@ Full_model_fit <- sampling(object = get_stanmodel(Full_model), data = Bra_data,
             iter = Nitt, warmup = warmup,chains = chains, verbose = TRUE, refresh = 10
             ,control = list(
               # adapt_delta = 0.5,
-              # max_treedepth = 12
+              max_treedepth = 10
               )
             ,pars = c("Lambda","QTF","F_vars","F_h2","E_h2","sigma2_a","sigma2_e","inv_tau","Y_hat","G","R","B","B_F","mu","B_scale"), include = T
             )
 fit = Full_model_fit
+
+a = get_sampler_params(fit, inc_warmup = T)[[1]]
+summary(do.call(rbind, args = list(a)), digits = 2)
+summary(do.call(rbind, args = get_sampler_params(fit, inc_warmup = F)), digits = 2)
+lapply(get_sampler_params(fit, inc_warmup = F),function(x) summary(x,digits=2))
+
+
 save(fit,file = sprintf('Bra_data_fit_K_%d.RData',sim_data$K))
 

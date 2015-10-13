@@ -4,7 +4,7 @@
 // Daniel Runcie --deruncie@ucdavis.edu
 // v2c - adding fixed effects for F
 // v3 - altering fixed effect structure for F vs Y
-// 
+// GDP from Armagan et al 2013 (from Yazdani and Dunson 2015)
 
 functions{
   vector tan_vec(vector X){
@@ -17,6 +17,13 @@ functions{
   vector pow_vec(vector X,real n){
     vector[rows(X)] res;
     for(i in 1:rows(X)){
+        res[i] <- pow(X[i],n);
+    }
+    return(res);
+  }
+  row_vector pow_rvec(row_vector X,real n){
+    row_vector[cols(X)] res;
+    for(i in 1:cols(X)){
         res[i] <- pow(X[i],n);
     }
     return(res);
@@ -52,68 +59,30 @@ functions{
     }
     return(res);
   }
-  // vector sample_a_rng(vector y, matrix QZ1LtZt, vector d, matrix LQZ1){
-  //   // ******* Probably wrong !!! ************ //
-  //   // generate sample from the posterior of a given y, s2_a, s2_e: y ~ N(Za,s2e), a~N(0,s2_a*A)
-  //   // uses: QZ1 * diag(d) * QZ1' = 1/s2e*L'Z'ZL + 1/s2a*I
-  //   // with: LL' = A
-  //   vector[rows(d)] mu;
-  //   vector[rows(d)] a_tilde;
-  //   vector[rows(d)] a;
-  //   vector[rows(d)] d_inv;
-  //   d_inv <- pow_vec(d,-1.0);
-  //   mu <- diag_pre_multiply(d_inv,QZ1LtZt) * y;
-  //   for(i in 1:rows(d)){
-  //     a_tilde[i] <- normal_rng(mu[i],sqrt(d_inv[i]));
-  //   }
-  //   a <- LQZ1*a_tilde;
-  //   return(a);
-  // }
-  vector sample_a_rng(vector y, matrix QtLiZt, real s2_a, real s2_e, vector d, matrix LitQ){
-    // generate sample from the posterior of a given y, s2_a, s2_e: y ~ N(Za,s2e), a~N(0,s2_a*A)
-    // uses: Q * diag(d) * Q' = 1/s2e*LiZ'ZLit + 1/s2a*I
-    // with: L'L = A
-    vector[rows(d)] mu;
-    vector[rows(d)] a_tilde;
-    vector[rows(d)] a;
-    vector[rows(d)] D_inv;
-    D_inv <- pow_vec(1/s2_a + d/s2_e,-1.0);
-    mu <- diag_pre_multiply(D_inv,QtLiZt) * y / s2_e;
-    for(i in 1:rows(d)){
-      a_tilde[i] <- normal_rng(mu[i],sqrt(D_inv[i]));
-    }
-    a <- LitQ*a_tilde;
-    return(a);
-  }
 }
 
 data {
-  int<lower=1>  n;                // number of individuals 1 ...n
-  int<lower=1>  p;                // number of traits 1 ... p
-  int<lower=0>  K;                // number of latent factors 
-  int<lower=1>  b;                // number of fixed effects 
-  int<lower=0>  r1;               // number of levels of random effect 1 (in Q)
-  int<lower=0>  r2;               // number of levels of random effect 2 (not in Q)
-  matrix[n,p]   Y;                // data matrix of order [n,p]
-  matrix[n,b]   X;                // fixed effect design matrix
-  matrix[n,p]   cisGenotypes;     // genotypes for each of the p traits
-  matrix[n,r1]  Z1;               // random effect 2 design matrix
-  matrix[n,r2]  Z2;               // random effect 2 design matrix
-  real          nu_B;      // shrinkage for Bs
-  real          alpha_B;
-  real          beta_B;
-  real          nu;        // shrinkage for Lambdas
-  real          alpha1;
-  real          beta1;
-  real          alpha2;
-  real          beta2;
-  real          sigma_scale;
-  int           F_vars_beta;
-  matrix[n,n]   Q;         // Q * diag(d) * Q' = Z1 %*% t(Z1)
-  vector[n]     d;
-  matrix[r1,n]  QtLiZt;   // QZ1 * diag(QZ1_d) %*% QZ1' = t(L) %*% t(Z) %*% Z %*% L
-  vector[r1]    QZ1_d;
-  matrix[r1,r1] LitQ;       
+  int<lower=1> n;                // number of individuals 1 ...n
+  int<lower=1> p;                // number of traits 1 ... p
+  int<lower=0> K;                // number of latent factors 
+  int<lower=1> b;                // number of fixed effects 
+  int<lower=0> r2;               // number of levels of random effect 2 (not in Q)
+  matrix[n,p]  Y;                // data matrix of order [n,p]
+  matrix[n,b]  X;                // fixed effect design matrix
+  matrix[n,r2] Z2;               // random effect 2 design matrix
+  matrix[r2,r2] A2_chol;         // cholesky factor for A2 such that A2_chol * A2_chol' = A2
+  real         nu_B;      // shrinkage for Bs
+  real         alpha_B;
+  real         beta_B;
+  real         nu;        // shrinkage for Lambdas
+  real         alpha1;
+  real         beta1;
+  real         alpha2;
+  real         beta2;
+  real         sigma_scale;
+  matrix[n,n]  Q;
+  vector[n]    d;
+  int          F_vars_beta;
 }
 
 transformed data {
@@ -121,7 +90,6 @@ transformed data {
   vector[n]     QT_mu;
   vector[n]     QTY[p];
   matrix[n,b]   QTX;
-  matrix[n,p]   QTcis;
   matrix[n,r2]  QTZ2;
   int           num_vars; // 2 + any_fixed_effects + any_extra_random_effects
   print("N: ",n," p: ",p," b: ",b," K: ",K);
@@ -141,9 +109,6 @@ transformed data {
   // rotate X by QT
   QTX <- QT*X;
 
-  // rotate cisGenotypes by QT
-  QTcis <- QT*cisGenotypes;
-
   // rotate Z2 by QT
   if(r2 > 0){
     QTZ2 <- QT*Z2;
@@ -161,29 +126,25 @@ parameters{
 
   vector[b]             B_scale;        // scale factor for B coefficients
   matrix[b,p]           B_std;          // std_normal underlying fixed effect coefficients for Y
-  matrix<lower=0>[b,p]  B_psi;          // precision of fixed effect coefficients for Y
-
-  vector[p]             cis_effects;    // cis effect coefficients
+  matrix<lower=0>[b,p]  B_exp;          // precision of fixed effect coefficients for Y
+  matrix<lower=0>[b,p]  B_gam;          // precision parameter of fixed effect coefficients for Y
 
   vector[n]             F_std[K];       // std_normal underlying F
   vector[b]             B_F_std[K];     // std_normal underlying fixed effect coefficients for F
   vector[r2]            U2_F_std[K];     // std_normal underlying random effect 2 coefficients for F
   vector[F_vars_beta]   F_vars_z[K,num_vars];  // components of re-parameterized simplex F_vars - a,r,b,a2
 
-  vector<lower=0,upper=pi()/2>[p] sigma_U2_unif;      // sd 2nd random effect - re-parameterized cauchy
-  vector<lower=0,upper=pi()/2>[p] sigma_unif;         // total variation (G+E) of each gene's residuals on the factors - re-parameterized cauchy
-  vector<lower=0,upper=.95>[p]    E_h2;               // residual heritability
+  vector<lower=0,upper=pi()/2>[p] sigma_unif[2+(r2>0)];  // variances for residuals: 1: A, 2: I, 3: A2 - re-parameterized cauchy
 
   row_vector[p]          Lambda_std[K]; // std_normal underlying Lambda mixture
   row_vector<lower=0>[p] psi[K];        // part of the precision mixture contributing to t-distribution on Lambda components
-  vector<lower=0>[1]     delta_1;       // first shrinkage component of tau
-  vector<lower=0>[K-1]   delta_K;       // remaining shrinkage components of tau
-
+  vector<lower=0>[K]     delta;    // shrinkage components of tau
 }
 
 transformed parameters{
   vector[p]     sigma_U2;   // residual genetic sd
-  vector[p]     sigma;      // total variation (G+E) of each gene's residuals on the factors
+  vector[p]     sigma2_a;      // total variation (G+E) of each gene's residuals on the factors
+  vector[p]     sigma2_e;      // total variation (G+E) of each gene's residuals on the factors
   row_vector[p] Lambda[K]; 
   vector[K]     tau;  
   vector[n]     QTF[K];     // rotated factor scores  
@@ -193,18 +154,23 @@ transformed parameters{
   simplex[num_vars]    F_vars[K];   // variances of variance components of F (fixed, random, resid)
 
 // sds - re-parmeterized cauchy
-  sigma_U2 <- sigma_scale * tan_vec(sigma_U2_unif);
-  sigma    <- sigma_scale * tan_vec(sigma_unif);
+  sigma2_a <- pow_vec(sigma_scale * tan_vec(sigma_unif[1]),2.0);
+  sigma2_e <- pow_vec(sigma_scale * tan_vec(sigma_unif[2]),2.0);
+  if(r2 > 0) {
+    sigma_U2 <- sigma_scale * tan_vec(sigma_unif[3]);
+  }
 
 // Fixed effect residuals
   if(b > 0){
-    B_resid <- B_std ./ sqrt_mat(diag_pre_multiply(B_scale,B_psi));
+    for(i in 1:b){
+      B_resid[i] <- B_std[i] .* sqrt_rvec(1/B_scale[i] * (rep_row_vector(4,p)./pow_rvec(B_gam[i],2.0)).*B_exp[i]);
+    }
   }
 
 // Factors
   if(K > 0){
 // Lambda - factor loadings
-    tau <- cum_prod(append_row(delta_1,delta_K));
+    tau <- cum_prod(delta);
     for(k in 1:K){
       Lambda[k] <- Lambda_std[k] ./ sqrt_rvec(psi[k] * tau[k]);
     }
@@ -232,7 +198,7 @@ transformed parameters{
       int var_index;
       var_index <- 3 + (b>0);
       for(k in 1:K){
-        U2_F[k] <- U2_F_std[k] * sqrt(F_vars[k][var_index]);
+        U2_F[k] <- A2_chol * U2_F_std[k] * sqrt(F_vars[k][var_index]);
         QTF[k] <- QTF[k] + QTZ2 * U2_F[k];
       }
     }
@@ -243,7 +209,7 @@ model {
   vector[n] sd_E[p];  // residual standard deviations - including main random effect
 
 // note: mu has flat priors
-  cis_effects ~ normal(0,1);
+  mu ~ normal(0,1000);
 
 // Random effect 2
   if(r2 > 0) {
@@ -264,7 +230,8 @@ model {
     // coefficients
     for(x in 1:b){
       B_std[x] ~ normal(0,1);
-      B_psi[x] ~ gamma(nu_B/2.0,nu_B/2.0);
+      B_exp[x] ~ exponential(1);
+      B_gam[x] ~ gamma(nu_B/2,nu_B/2);
     }
   }
 
@@ -272,8 +239,10 @@ model {
   if(K > 0){
   // components of Lambda
     // column-wise shrinkage
-    delta_1 ~ gamma(alpha1, beta1); // global shrinkage
-    delta_K ~ gamma(alpha2, beta2); // additional shrinkage
+    delta[1] ~ gamma(alpha1, beta1); // global shrinkage
+    if(K>1){
+      segment(delta,2,K-1) ~ gamma(alpha2, beta2); // additional shrinkage
+    }
     // coefficients
     for(k in 1:K){
       Lambda_std[k] ~ normal(0,1);
@@ -295,19 +264,19 @@ model {
   
   //calculate rotated residual standard deviations - including main random effect
   for(j in 1:p){
-    sd_E[j] <- sigma[j] * sqrt_vec(E_h2[j] * d + (1.0 - E_h2[j]));
+    sd_E[j] <- sqrt_vec(sigma2_a[j] * d + sigma2_e[j]);
   }
 
 // likelihood
   {
     matrix[n,p] QTY_mean;
-    QTY_mean <- QT_mu * mu + diag_post_multiply(QTcis,cis_effects);
+    QTY_mean <- QT_mu * mu;
     if(b > 0){
       QTY_mean <- QTY_mean + QTX * B_resid;
     }
     // add in random effect 2
     if(r2 > 0){
-      QTY_mean <- QTY_mean + QTZ2 * diag_post_multiply(U2_std,sigma_U2);
+      QTY_mean <- QTY_mean + QTZ2 * A2_chol * diag_post_multiply(U2_std,sigma_U2);
     }
     // add in factors
     if(K > 0){
@@ -328,13 +297,12 @@ generated quantities {
   matrix[p,p] G;
   matrix[p,p] R;
   matrix[b,p] B;
-  vector[r1]  Fa[K];     // generated factor scores for random effect 1
   
   inv_tau <- rep_vector(1.0,K) ./ tau;
   
   Y_hat <- rep_vector(1.0,n) * mu;
-  G <- diag_matrix(pow_vec(sigma .* E_h2,2.0));
-  R <- diag_matrix(pow_vec(sigma .* (1.0-E_h2),2.0));
+  G <- diag_matrix(sigma2_a);
+  R <- diag_matrix(sigma2_e);
   B <- B_resid;
 
   if(b > 0){
@@ -342,7 +310,7 @@ generated quantities {
   }
 
   if(r2 > 0){
-    Y_hat <- Y_hat + Z2 * diag_post_multiply(U2_std,sigma_U2);
+    Y_hat <- Y_hat + Z2 * A2_chol * diag_post_multiply(U2_std,sigma_U2);
   }
 
   if(K > 0) {
@@ -361,18 +329,6 @@ generated quantities {
 
     for(k in 1:K){
       B <- B + B_F[k] * Lambda[k];
-    }
-
-    for(k in 1:K){
-      vector[n] f_resid;
-      f_resid <- Q*QTF[k];
-      if(b > 0){
-        f_resid <- f_resid - X*B_F[k];
-      }
-      if(r2 > 0){
-        f_resid <- f_resid - Z2*U2_F[k];
-      }
-      Fa[k] <- sample_a_rng(f_resid,QtLiZt,F_vars[k][1],F_vars[k][2],QZ1_d,LitQ);
     }
   }
   

@@ -60,6 +60,7 @@ sim_data$K = 0
 model = simpleB_model
 model = B_ARD_model
 model = B_GDP_model
+model = full_model
 # model = noDelta_model
 # model = noK_model
 fit <- sampling(object = get_stanmodel(model), data = sim_data, 

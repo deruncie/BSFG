@@ -76,7 +76,7 @@ save_sim = function(
 
 sim_reps = 3
 
-n_Lines = 100
+n_Lines = 150
 n_Reps = 3
 n_TRT = 2
 n = n_Lines*n_Reps*n_TRT

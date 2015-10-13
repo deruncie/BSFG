@@ -14,19 +14,29 @@ functions {
 		}
 		return(res);
 	}
-	vector sample_a_rng(vector y, matrix UtZt, vector d, matrix LiU){
-		int r;
-		vector[rows(d)] mu;
-		vector[rows(d)] a_tilde;
-		vector[rows(d)] a;
-		r <- rows(d);
-		mu <- diag_pre_multiply(d,UtZt) * y;
-		for(i in 1:r){
-			a_tilde[i] <- normal_rng(mu[i],sqrt(d[i]));
+	vector pow_vec(vector X,real n){
+		vector[rows(X)] res;
+		for(i in 1:rows(X)){
+			res[i] <- pow(X[i],n);
 		}
-		a <- LiU*a_tilde;
-		return(a);
+		return(res);
 	}
+	  vector sample_a_rng(vector y, matrix QtLiZt, real s2_a, real s2_e, vector d, matrix LitQ){
+	    // generate sample from the posterior of a given y, s2_a, s2_e: y ~ N(Za,s2e), a~N(0,s2_a*A)
+	    // uses: Q * diag(d) * Q' = 1/s2e*LiZ'ZLit + 1/s2a*I
+	    // with: L'L = A
+	    vector[rows(d)] mu;
+	    vector[rows(d)] a_tilde;
+	    vector[rows(d)] a;
+	    vector[rows(d)] D_inv;
+	    D_inv <- pow_vec(1/s2_a + d/s2_e,-1.0);
+	    mu <- diag_pre_multiply(D_inv,QtLiZt) * y / s2_e;
+	    for(i in 1:rows(d)){
+	      a_tilde[i] <- normal_rng(mu[i],sqrt(D_inv[i]));
+	    }
+	    a <- LitQ*a_tilde;
+	    return(a);
+	  }
 }
 data {
 	int<lower=1> N;

@@ -22,18 +22,10 @@ sim_data$F_vars_beta = 2
 # now calculate Q matrix:
 Z = sim_data$Z1
 A = sim_data$A1
-L = t(chol(A))
 svd_ZAZ = svd(Z %*% A %*% t(Z))
-Li = solve(L)
-svd_LZZL = svd(Li %*% t(Z) %*% Z %*% t(Li))
 sim_data$Q = svd_ZAZ$u
 sim_data$d = svd_ZAZ$d
-# sim_data$d[sim_data$d< 1e-13] = 0
-sim_data$r1 = ncol(Z)
-Q = svd_LZZL$u
-sim_data$QtLiZt = t(Q) %*% Li %*% t(Z)
-sim_data$QZ1_d = svd_LZZL$d
-sim_data$LitQ = t(Li) %*% Q
+sim_data$d[sim_data$d< 1e-13] = 0
 
 # if no X, add fake X
 if(is.null(sim_data$X)){
@@ -43,24 +35,50 @@ if(is.null(sim_data$X)){
 # if no Z2, add fake Z2
 if(is.null(sim_data$Z2)){
 	sim_data$Z2 = matrix(0,nr=sim_data$n,nc = 0)
-	sim_data$r2 = 0
+  sim_data$r2 = 0
+  sim_data$A2_chol = diag(1,sim_data$r2)
 }
 
-Nitt = 50
-warmup = 40
+Nitt = 100
+warmup = 50
 chains = 1
 
-eQTL_model <- stan(file = 'eQTL_model.stan', chains = 0)
+Full_model <- stan(file = 'Full_model.stan', chains = 0)
 
-eQTL_model_fit <- sampling(object = get_stanmodel(eQTL_model), data = sim_data, 
+Full_model_fit <- sampling(object = get_stanmodel(Full_model), data = sim_data, 
             iter = Nitt, warmup = warmup,chains = chains, verbose = TRUE, refresh = 10
             ,control = list(
               # adapt_delta = 0.5,
-              # max_treedepth = 12
+              # max_treedepth = 6
               )
-            ,pars = c("Lambda","QTF","F_vars","F_h2","E_h2","sigma","inv_tau","Y_hat","G","R","B","B_F","mu","B_scale","cis_effects"), include = T#,"Fa"
+            ,pars = c("Lambda","QTF","F_vars","F_h2","E_h2","sigma2_a","sigma2_e","inv_tau","Y_hat","G","R","B","B_F","B_resid","mu","B_scale"), include = T
             )
-fit = eQTL_model_fit
+fit = Full_model_fit
+
+
+chi2_model <- stan(file = 'Full_model_repChi2.stan', chains = 0)
+
+chi2_model_fit <- sampling(object = get_stanmodel(chi2_model), data = sim_data, 
+            iter = Nitt, warmup = warmup,chains = chains, verbose = TRUE, refresh = 10
+            ,control = list(
+              # adapt_delta = 0.5,
+              # max_treedepth = 6
+              )
+            ,pars = c("Lambda","QTF","F_vars","F_h2","E_h2","sigma2_a","sigma2_e","inv_tau","Y_hat","G","R","B","B_F","B_resid","mu","B_scale"), include = T
+            )
+fit = chi2_model_fit
+
+simpleB_model <- stan(file = 'Full_model_simpleB.stan', chains = 0)
+
+simpleB_model_fit <- sampling(object = get_stanmodel(simpleB_model), data = sim_data, 
+            iter = Nitt, warmup = warmup,chains = chains, verbose = TRUE, refresh = 10
+            ,control = list(
+              # adapt_delta = 0.5,
+              # max_treedepth = 6
+              )
+            ,pars = c("Lambda","QTF","F_vars","F_h2","E_h2","sigma2_a","sigma2_e","inv_tau","Y_hat","G","R","B","B_F","B_resid","mu","B_scale"), include = T
+            )
+fit = simpleB_model_fit
 
 a = get_sampler_params(fit, inc_warmup = T)[[1]]
 summary(do.call(rbind, args = list(a)), digits = 2)
@@ -69,7 +87,6 @@ summary(do.call(rbind, args = get_sampler_params(fit, inc_warmup = F)), digits =
 # compare fitted values to true values
 y_hat = get_posterior_mean(fit,pars='Y_hat')
 plot(t(sim_data$Y),y_hat);abline(0,1)
-
 
 # compare fitted Lambda to true Lambda
 Lambda_est = matrix(get_posterior_mean(fit,pars='Lambda'),sim_data$p,sim_data$K,byrow=F)
@@ -85,16 +102,6 @@ corL = corL[,matched_cols]
 image(corL^2,zlim=c(0,1))
 corL
 apply(abs(corL),1,max)
-
-cis_effects = get_posterior_mean(fit,'cis_effects')
-plot(cis_effects,sim_data$cis_effects);abline(0,1)
-
-F_a = matrix(get_posterior_mean(fit,'Fa'),nc = sim_data$K)
-cor_FA = cor(F_a,sim_data$F_A1)
-image(cor_FA^2,zlim=c(0,1))
-cor_FA
-
-
 
 plot(Lambda_act,Lambda_est,col = matrix(1:sim_data$K,nr=sim_data$p,nc = sim_data$K,byrow=T));abline(0,1)
 plot(sim_data$Lambda %*% t(sim_data$Lambda),Lambda_est  %*% t(Lambda_est));abline(0,1)
@@ -134,7 +141,7 @@ rstan::traceplot(fit, pars = "F_vars", inc_warmup = T)
 plot(fit, pars = "inv_tau")
 plot(fit, pars = "F_h2")
 plot(fit, pars = "E_h2")
-plot(fit, pars = c("B",'B_F'))
+plot(fit, pars = c("B_resid",'B_F'))
 plot(fit, pars = c('B'))
 plot(fit, pars = c('B_F'))
 plot(fit, pars = c('mu'))

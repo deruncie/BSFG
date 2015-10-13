@@ -19,7 +19,7 @@ simulate_data = function(
   p = nrow(Lambda)
   K = ncol(Lambda)
   
-  cis_effects = rnorm(p)
+  cis_effects = 0*rnorm(p)
 
   E_A1 = t(A1_chol) %*% matrix(rnorm(r*p),r,p) %*% diag(E_h2)
   F_A1 = t(A1_chol) %*% matrix(rnorm(r*k),r,k) %*% diag(F_vars[,2])
